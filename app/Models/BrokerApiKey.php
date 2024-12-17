@@ -13,5 +13,6 @@ class BrokerApiKey extends Model
         'user_id',
         'broker_name',
         'api_key',
+        'api_secret',
     ];
 }

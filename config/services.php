@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'phemex' => [
+        'api_key' => env('PHEMEX_apiKey'),
+        'api_secret' => env('PHEMEX_apiSecret'),
+    ],
+
 ];
