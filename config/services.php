@@ -36,8 +36,10 @@ return [
     ],
 
     'phemex' => [
-        'api_key' => env('PHEMEX_apiKey'),
-        'api_secret' => env('PHEMEX_apiSecret'),
+        'api_key' => env('PHEMEX_API_KEY'),
+        'api_secret' => env('PHEMEX_API_SECRET'),
+        'user_id' => env('PHEMEX_USER_ID'), // Your Phemex user ID
     ],
+
 
 ];
