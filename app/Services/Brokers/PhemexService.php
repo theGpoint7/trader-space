@@ -147,6 +147,9 @@ class PhemexService
         {
             $phemexService = app('App\Services\Brokers\PhemexService');
             $response = $phemexService->getTradeHistory();
+            
+            // Log the raw API response
+            \Log::info('Phemex API Response: ' . json_encode($response));
         
             if (isset($response['error'])) {
                 \Log::error('Error fetching trade history: ' . $response['error']);
@@ -184,7 +187,7 @@ class PhemexService
                 ]);
             }
         }
-        
+    
     public function syncPositions()
         {
             $phemexService = app('App\Services\Brokers\PhemexService');

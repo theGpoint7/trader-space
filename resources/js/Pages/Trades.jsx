@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
+import { Inertia } from '@inertiajs/inertia'; // Import Inertia for triggering requests
 
 export default function Trades() {
     const generateRandomOrderID = () => `order-${Math.random().toString(36).substr(2, 9)}`;
@@ -25,6 +26,20 @@ export default function Trades() {
         });
     };
 
+    // Function to trigger the syncTradeHistory endpoint
+    const handleSyncHistory = () => {
+        if (confirm('Are you sure you want to sync trade history?')) {
+            Inertia.visit('/trades/sync-history', {
+                method: 'get',
+                onSuccess: () => alert('Trade history synced successfully!'),
+                onError: (errors) => {
+                    console.error(errors);
+                    alert('Failed to sync trade history. Check logs for details.');
+                },
+            });
+        }
+    };
+
     return (
         <AuthenticatedLayout
             header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Trades</h2>}
@@ -34,6 +49,16 @@ export default function Trades() {
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <div className="p-6 text-gray-900">
+                            {/* Sync Trade History Button */}
+                            <div className="mb-6">
+                                <button
+                                    onClick={handleSyncHistory}
+                                    className="px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                >
+                                    Sync Trade History
+                                </button>
+                            </div>
+
                             <form onSubmit={handleSubmit}>
                                 {/* Order ID Input */}
                                 <div className="mb-4">

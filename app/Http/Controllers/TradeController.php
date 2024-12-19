@@ -202,4 +202,56 @@ class TradeController extends Controller
         }
     }
     
+    public function syncTradeHistory()
+    {
+        try {
+            $phemexService = app('App\Services\Brokers\PhemexService');
+            $response = $phemexService->getTradeHistory();
+    
+            // Log the raw API response for debugging
+            \Log::info('Sync Trade History Response: ' . json_encode($response));
+    
+            if (isset($response['error'])) {
+                \Log::error('Error fetching trade history: ' . $response['error']);
+                return back()->withErrors(['error' => $response['error']]);
+            }
+    
+            $trades = $response['data']['rows'] ?? [];
+    
+            foreach ($trades as $trade) {
+                // Find the trade by order_id or create it
+                $existingTrade = Trade::firstOrCreate(
+                    ['order_id' => $trade['orderID']],
+                    [
+                        'user_id' => auth()->id(),
+                        'broker' => 'Phemex',
+                        'cl_order_id' => $trade['clOrdID'],
+                        'symbol' => $trade['symbol'],
+                        'side' => strtolower($trade['side']),
+                        'quantity' => $trade['execQtyRq'],
+                        'price' => $trade['execPriceRp'],
+                        'leverage' => $trade['leverageRr'] ?? null,
+                        'status' => $trade['closedSizeRq'] > 0 ? 'closed' : 'open',
+                    ]
+                );
+    
+                // Log the trade event
+                PositionLog::create([
+                    'trade_id' => $existingTrade->id,
+                    'order_id' => $trade['orderID'],
+                    'cl_order_id' => $trade['clOrdID'],
+                    'symbol' => $trade['symbol'],
+                    'action' => $trade['side'],
+                    'details' => json_encode($trade),
+                    'executed_at' => now(),
+                ]);
+            }
+    
+            return back()->with('success', 'Trade history synced successfully.');
+        } catch (\Exception $e) {
+            \Log::error('Sync Trade History Failed: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'An unexpected error occurred.']);
+        }
+    }
+    
 }

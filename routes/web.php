@@ -34,7 +34,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/positions', [TradeController::class, 'getPositions'])->name('positions');
     Route::get('/trades', [TradeController::class, 'index'])->name('trades');
     Route::put('/trades/place-order', [TradeController::class, 'placeOrder'])->name('trades.placeOrder');
+    // Add this new route for syncing trade history
+    Route::get('/trades/sync-history', [TradeController::class, 'syncTradeHistory'])->name('trades.syncHistory');
 });
+
 
 // Profile routes
 Route::middleware('auth')->group(function () {
