@@ -12,21 +12,23 @@ class TradeController extends Controller
     /**
      * Display the list of trades for the authenticated user.
      */
-    public function index()
+        public function index()
     {
         $trades = Trade::where('user_id', auth()->id())
             ->orderBy('created_at', 'desc')
             ->get();
 
+        $phemexTrades = \App\Models\PhemexTrade::orderBy('transact_time_ns', 'desc')->get();
+
         return Inertia::render('Trades', [
             'trades' => $trades,
+            'phemexTrades' => $phemexTrades,
         ]);
     }
-
     /**
      * Place a new order and log the position creation.
      */
-    public function placeOrder(Request $request)
+        public function placeOrder(Request $request)
     {
         $validated = $request->validate([
             'clOrdID' => 'required|string',
@@ -100,11 +102,10 @@ class TradeController extends Controller
             return response()->json(['error' => 'An unexpected error occurred.'], 500);
         }
     }
-
     /**
      * Fetch positions and update trade status, including logging updates and closures.
      */
-    public function getPositions()
+        public function getPositions()
     {
         try {
             $phemexService = app('App\Services\Brokers\PhemexService');
@@ -202,55 +203,55 @@ class TradeController extends Controller
         }
     }
     
-    public function syncTradeHistory()
+
+        public function syncTradeHistory()
     {
         try {
+            // Fetch trade history using the service
             $phemexService = app('App\Services\Brokers\PhemexService');
             $response = $phemexService->getTradeHistory();
     
-            // Log the raw API response for debugging
-            \Log::info('Sync Trade History Response: ' . json_encode($response));
+            // Log API response for debugging
+            \Log::info('Sync Trade History Response: ', $response);
     
+            // Handle API errors
             if (isset($response['error'])) {
                 \Log::error('Error fetching trade history: ' . $response['error']);
-                return back()->withErrors(['error' => $response['error']]);
+                return response()->json(['error' => $response['error']], 409); // Return conflict error
             }
     
+            // Process trade data
             $trades = $response['data']['rows'] ?? [];
     
             foreach ($trades as $trade) {
-                // Find the trade by order_id or create it
-                $existingTrade = Trade::firstOrCreate(
-                    ['order_id' => $trade['orderID']],
-                    [
-                        'user_id' => auth()->id(),
-                        'broker' => 'Phemex',
-                        'cl_order_id' => $trade['clOrdID'],
-                        'symbol' => $trade['symbol'],
-                        'side' => strtolower($trade['side']),
-                        'quantity' => $trade['execQtyRq'],
-                        'price' => $trade['execPriceRp'],
-                        'leverage' => $trade['leverageRr'] ?? null,
-                        'status' => $trade['closedSizeRq'] > 0 ? 'closed' : 'open',
-                    ]
-                );
-    
-                // Log the trade event
-                PositionLog::create([
-                    'trade_id' => $existingTrade->id,
-                    'order_id' => $trade['orderID'],
-                    'cl_order_id' => $trade['clOrdID'],
-                    'symbol' => $trade['symbol'],
-                    'action' => $trade['side'],
-                    'details' => json_encode($trade),
-                    'executed_at' => now(),
-                ]);
+                try {
+                    \App\Models\PhemexTrade::firstOrCreate(
+                        ['transact_time_ns' => $trade['transactTimeNs'] ?? null], // Unique identifier
+                        [
+                            'exec_id' => $trade['execID'] ?? null,
+                            'pos_side' => $trade['posSide'] ?? null,
+                            'ord_type' => $trade['ordType'] ?? null,
+                            'exec_qty' => $trade['execQtyRq'] ?? null,
+                            'exec_value' => $trade['execValueRv'] ?? null,
+                            'exec_fee' => $trade['execFeeRv'] ?? null,
+                            'closed_pnl' => $trade['closedPnlRv'] ?? null,
+                            'fee_rate' => $trade['feeRateRr'] ?? null,
+                            'exec_status' => $trade['execStatus'] ?? null,
+                            'broker' => 'Phemex',
+                            'symbol' => $trade['symbol'],
+                            'side' => $trade['side'],
+                            'price' => $trade['execPriceRp'] ?? null,
+                        ]
+                    );
+                } catch (\Exception $e) {
+                    \Log::error('Error saving trade: ' . $e->getMessage());
+                }
             }
     
-            return back()->with('success', 'Trade history synced successfully.');
+            return response()->json(['message' => 'Trade history synced successfully.'], 200);
         } catch (\Exception $e) {
             \Log::error('Sync Trade History Failed: ' . $e->getMessage());
-            return back()->withErrors(['error' => 'An unexpected error occurred.']);
+            return response()->json(['error' => 'An unexpected error occurred.'], 500);
         }
     }
     

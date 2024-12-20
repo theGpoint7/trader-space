@@ -145,49 +145,59 @@ class PhemexService
     
     public function syncTradeHistory()
         {
-            $phemexService = app('App\Services\Brokers\PhemexService');
-            $response = $phemexService->getTradeHistory();
-            
-            // Log the raw API response
-            \Log::info('Phemex API Response: ' . json_encode($response));
+            try {
+                $response = $this->getTradeHistory();
         
-            if (isset($response['error'])) {
-                \Log::error('Error fetching trade history: ' . $response['error']);
-                return;
-            }
+                // Log the raw API response
+                \Log::info('Phemex API Response: ' . json_encode($response));
         
-            $trades = $response['data']['rows'] ?? [];
+                if (isset($response['error'])) {
+                    \Log::error('Error fetching trade history: ' . $response['error']);
+                    return;
+                }
         
-            foreach ($trades as $trade) {
-                // Find the trade by order_id or create it
-                $existingTrade = Trade::firstOrCreate(
-                    ['order_id' => $trade['orderID']],
-                    [
-                        'user_id' => auth()->id(),
+                $trades = $response['data']['rows'] ?? [];
+        
+                foreach ($trades as $trade) {
+                    $tradeData = [
+                        'exec_id' => $trade['execID'],
+                        'pos_side' => $trade['posSide'],
+                        'ord_type' => $trade['ordType'],
+                        'exec_qty' => $trade['execQtyRq'],
+                        'exec_value' => $trade['execValueRv'],
+                        'exec_fee' => $trade['execFeeRv'],
+                        'closed_pnl' => $trade['closedPnlRv'],
+                        'fee_rate' => $trade['feeRateRr'],
+                        'exec_status' => $trade['execStatus'],
                         'broker' => 'Phemex',
-                        'cl_order_id' => $trade['clOrdID'],
                         'symbol' => $trade['symbol'],
-                        'side' => strtolower($trade['side']),
-                        'quantity' => $trade['execQtyRq'],
+                        'side' => $trade['side'],
                         'price' => $trade['execPriceRp'],
-                        'leverage' => $trade['leverageRr'] ?? null,
-                        'status' => $trade['closedSizeRq'] > 0 ? 'closed' : 'open',
-                    ]
-                );
+                    ];
         
-                // Log the trade event
-                PositionLog::create([
-                    'trade_id' => $existingTrade->id,
-                    'order_id' => $trade['orderID'],
-                    'cl_order_id' => $trade['clOrdID'],
-                    'symbol' => $trade['symbol'],
-                    'action' => $trade['side'],
-                    'details' => json_encode($trade),
-                    'executed_at' => Carbon::createFromTimestampNano($trade['transactTimeNs']),
-                ]);
+                    // Conditionally include `transact_time_ns` if it exists
+                    if (isset($trade['transactTimeNs'])) {
+                        $tradeData['transact_time_ns'] = $trade['transactTimeNs'];
+                    }
+        
+                    // Use the PhemexTrade model to insert or update trades in the `phemex_trades` table
+                    $existingTrade = \App\Models\PhemexTrade::firstOrCreate(
+                        ['transact_time_ns' => $trade['transactTimeNs'] ?? null],
+                        $tradeData
+                    );
+        
+                    // Log each trade synced
+                    \Log::info('Synced Phemex Trade', [
+                        'transact_time_ns' => $trade['transactTimeNs'] ?? 'NULL',
+                        'symbol' => $trade['symbol'],
+                        'side' => $trade['side'],
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('Error syncing trade history: ' . $e->getMessage());
             }
         }
-    
+        
     public function syncPositions()
         {
             $phemexService = app('App\Services\Brokers\PhemexService');
@@ -262,5 +272,51 @@ class PhemexService
                 }
             }
         }
+
+    public function getTradeHistory()
+        {
+            try {
+                $expiry = now()->timestamp + 60; // 1-minute expiry
+                $path = '/api-data/g-futures/trades'; // Correct endpoint path
+                $queryString = 'symbol=BTCUSDT'; // Correct query string for the endpoint
         
+                // Construct the string to sign (path + queryString + expiry)
+                $stringToSign = $path . $queryString . $expiry;
+        
+                // Generate HMAC SHA256 signature
+                $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
+        
+                // Log details for debugging
+                \Log::info('Fetching Trade History', [
+                    'endpoint' => $path,
+                    'string_to_sign' => $stringToSign,
+                    'signature' => $signature,
+                    'expiry' => $expiry,
+                ]);
+        
+                // Make the GET request
+                $response = $this->http->get($path, [
+                    'query' => ['symbol' => 'BTCUSDT'], // Pass the query parameter
+                    'headers' => [
+                        'x-phemex-access-token' => $this->apiKey,
+                        'x-phemex-request-expiry' => $expiry,
+                        'x-phemex-request-signature' => $signature,
+                        'Content-Type' => 'application/json',
+                    ],
+                ]);
+        
+                $responseData = json_decode((string) $response->getBody(), true);
+        
+                // Log the raw response for debugging
+                \Log::info('Trade History Response:', $responseData);
+        
+                return $responseData;
+            } catch (\Exception $e) {
+                // Log the error message
+                \Log::error('Error fetching trade history: ' . $e->getMessage());
+                return ['error' => $e->getMessage()];
+            }
+        }
+        
+
     }

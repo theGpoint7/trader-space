@@ -14,6 +14,7 @@ class Trade extends Model
         'user_id',
         'broker',
         'order_id',
+        'cl_order_id',
         'symbol',
         'side',
         'quantity',
@@ -22,6 +23,7 @@ class Trade extends Model
         'status',
         'trigger_source',
         'signal_id',
+        'closed_pnl',
     ];
 
     // Define relationships
@@ -41,4 +43,12 @@ class Trade extends Model
     // {
     //     return $this->belongsTo(Signal::class);
     // }
+
+    /**
+     * Logs related to the trade position.
+     */
+    public function positionLogs()
+    {
+        return $this->hasMany(PositionLog::class);
+    }
 }

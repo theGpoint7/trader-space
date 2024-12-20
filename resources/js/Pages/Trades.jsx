@@ -1,22 +1,21 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
-import { Inertia } from '@inertiajs/inertia'; // Import Inertia for triggering requests
+import { Inertia } from '@inertiajs/inertia';
 
-export default function Trades() {
+export default function Trades({ phemexTrades }) {
     const generateRandomOrderID = () => `order-${Math.random().toString(36).substr(2, 9)}`;
 
     const { data, setData, put, processing } = useForm({
-        clOrdID: generateRandomOrderID(), // Automatically generated random order ID
-        symbol: 'BTCUSDT', // Default symbol
-        side: '', // Default side
-        orderQtyRq: 0.001, // Default order quantity
-        trigger_source: 'website_button', // Default trigger source
+        clOrdID: generateRandomOrderID(),
+        symbol: 'BTCUSDT',
+        side: '',
+        orderQtyRq: 0.001,
+        trigger_source: 'website_button',
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Call the placeOrder route using PUT
         put('/trades/place-order', {
             onSuccess: () => alert('Order placed successfully!'),
             onError: (errors) => {
@@ -26,18 +25,23 @@ export default function Trades() {
         });
     };
 
-    // Function to trigger the syncTradeHistory endpoint
     const handleSyncHistory = () => {
         if (confirm('Are you sure you want to sync trade history?')) {
-            Inertia.visit('/trades/sync-history', {
-                method: 'get',
-                onSuccess: () => alert('Trade history synced successfully!'),
-                onError: (errors) => {
-                    console.error(errors);
-                    alert('Failed to sync trade history. Check logs for details.');
+            Inertia.get('/trades/sync-history', {
+                onSuccess: (page) => {
+                    alert(page.props.flash?.success || 'Trade history synced successfully!');
+                },
+                onError: (error) => {
+                    console.error('Sync failed:', error);
+                    alert(error.response?.data?.error || 'Failed to sync trade history. Please check the logs.');
                 },
             });
         }
+    };
+
+    const formatTimestamp = (timestampNs) => {
+        const milliseconds = Math.floor(timestampNs / 1e6);
+        return new Date(milliseconds).toLocaleString(); // Convert to readable format
     };
 
     return (
@@ -149,6 +153,37 @@ export default function Trades() {
                                     Place Order
                                 </button>
                             </form>
+
+                            {/* Phemex Trades Table */}
+                            <div className="mt-8">
+                                <h3 className="text-lg font-semibold mb-4">Phemex Trades</h3>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead>
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbol</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Side</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exec Fee</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {phemexTrades.map((trade) => (
+                                                <tr key={trade.id}>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{formatTimestamp(trade.transact_time_ns)}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{trade.symbol}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{trade.side}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{trade.exec_qty}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{trade.price}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{trade.exec_fee}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
