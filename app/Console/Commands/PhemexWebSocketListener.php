@@ -6,7 +6,7 @@ use Illuminate\Console\Command;
 use Ratchet\Client\Connector;
 use React\EventLoop\Factory as LoopFactory;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class PhemexWebSocketListener extends Command
 {
@@ -30,7 +30,6 @@ class PhemexWebSocketListener extends Command
 
         $connector('wss://ws.phemex.com')->then(function ($conn) use ($loop) {
             $this->info("WebSocket connected successfully!");
-            Log::channel('websocket')->debug("WebSocket connected successfully");
 
             // Authenticate with the Phemex WebSocket
             $expiry = now()->timestamp + 120;
@@ -49,12 +48,10 @@ class PhemexWebSocketListener extends Command
             ];
 
             $this->info("Auth Payload: " . json_encode($authPayload));
-            Log::channel('websocket')->debug("Sending authentication payload", $authPayload);
             $conn->send(json_encode($authPayload));
 
             // Handle incoming messages
             $conn->on('message', function ($msg) use ($conn) {
-                Log::channel('websocket')->debug("Received WebSocket message", ['message' => $msg]);
                 $this->processMessage($msg, $conn);
             });
 
@@ -67,16 +64,13 @@ class PhemexWebSocketListener extends Command
                 ];
                 $conn->send(json_encode($pingPayload));
                 $this->info("Sent: server.ping");
-                Log::channel('websocket')->debug("Sent server.ping payload", $pingPayload);
             });
 
             $conn->on('close', function () {
                 $this->warn("WebSocket connection closed.");
-                Log::channel('websocket')->debug("WebSocket connection closed");
             });
         }, function ($e) {
             $this->error("Could not connect: {$e->getMessage()}");
-            Log::channel('websocket')->debug("WebSocket connection failed", ['error' => $e->getMessage()]);
         });
 
         $loop->run();
@@ -88,20 +82,17 @@ class PhemexWebSocketListener extends Command
     private function processMessage($msg, $conn)
     {
         $this->info("Raw Message: {$msg}");
-        Log::channel('websocket')->debug("Processing raw message", ['message' => $msg]);
         $data = json_decode($msg, true);
 
         // Handle errors
         if (isset($data['error']) && $data['error'] !== null) {
             $this->error("Error: " . json_encode($data['error']));
-            Log::channel('websocket')->debug("Error in message", ['error' => $data['error']]);
             return;
         }
 
         // Successful authentication
         if (isset($data['id']) && $data['id'] == 1 && $data['result']['status'] === 'success') {
             $this->info("Authentication successful. Subscribing to BTC price updates...");
-            Log::channel('websocket')->debug("Authentication successful");
 
             // Subscribe to BTC price updates
             $btcPricePayload = [
@@ -111,17 +102,23 @@ class PhemexWebSocketListener extends Command
             ];
             $conn->send(json_encode($btcPricePayload));
             $this->info("Sent: BTC Price Subscription");
-            Log::channel('websocket')->debug("Sent BTC price subscription payload", $btcPricePayload);
         }
 
         // Handle BTC price updates
         if (isset($data['tick']) && isset($data['tick']['symbol']) && $data['tick']['symbol'] === ".BTC") {
             $price = $data['tick']['last'] / (10 ** $data['tick']['scale']);
             $this->info("BTC Price Update: $price");
-            Log::channel('websocket')->info("BTC Price Update", ['price' => $price]);
 
-            // Broadcast the price to connected clients or update as needed
-            broadcast(new \App\Events\BtcPriceUpdated($price));
+            // Send the BTC price to the Socket.io server
+            $response = Http::post('http://socketio:4000/update-btc-price', [
+                'price' => $price
+            ]);
+
+            if ($response->successful()) {
+                $this->info("BTC Price sent to Socket.IO server successfully");
+            } else {
+                $this->error("Failed to send BTC price to Socket.IO server");
+            }
         }
     }
 }

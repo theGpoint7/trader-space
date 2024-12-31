@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const bodyParser = require('body-parser');
 
 const PORT = process.env.PORT || 4000;
 const app = express();
@@ -13,8 +14,9 @@ const io = socketIo(server, {
     }
 });
 
-// Enable CORS for the Express app
+// Enable CORS and body parser for the Express app
 app.use(cors());
+app.use(bodyParser.json());
 
 // Serve a basic HTML page at the root URL
 app.get('/', (req, res) => {
@@ -41,12 +43,13 @@ io.on('connection', (socket) => {
     });
 });
 
-// Emit BTC price updates every 5 seconds to all connected clients
-setInterval(() => {
-    const btcPrice = (Math.random() * 10000 + 50000).toFixed(2); // Simulated BTC price
-    console.log(`Emitting BTC price: ${btcPrice}`);
+// Endpoint to receive BTC price updates
+app.post('/update-btc-price', (req, res) => {
+    const btcPrice = req.body.price;
+    console.log(`Received BTC price update: ${btcPrice}`);
     io.emit('btcPrice', { price: btcPrice });
-}, 5000);
+    res.sendStatus(200);
+});
 
 server.listen(PORT, () => {
     console.log(`WebSocket server started on port ${PORT}`);
