@@ -1,79 +1,50 @@
+import React, { useEffect, useState } from 'react';
+import Echo from 'laravel-echo';
+import io from 'socket.io-client';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
 
-export default function Positions({ positions: initialPositions }) {
-    const [positions, setPositions] = useState(initialPositions);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [error, setError] = useState(null);
+window.io = io;
 
-    const refreshPositions = () => {
-        setIsRefreshing(true);
-        router.get('/positions', {}, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                setPositions(page.props.positions);
-                setError(null);
-            },
-            onError: (errors) => {
-                setError('Failed to refresh positions.');
-                console.error('Error refreshing positions:', errors);
-            },
-            onFinish: () => setIsRefreshing(false),
-        });
-    };
+export default function Positions({ positions }) {
+    const [btcPrice, setBtcPrice] = useState('Loading...');
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            router.reload({
-                only: ['positions'],
-                onSuccess: (page) => {
-                    setPositions(page.props.positions);
-                },
-                onError: (errors) => {
-                    console.error('Error during auto-refresh:', errors);
-                },
-            });
-        }, 60000); // Refresh every 60 seconds
+        const echo = new Echo({
+            broadcaster: 'socket.io',
+            host: `${import.meta.env.VITE_SOCKETIO_HOST}:${import.meta.env.VITE_SOCKETIO_PORT}`,
+        });
 
-        return () => clearInterval(interval); // Cleanup interval on unmount
+        echo.connector.socket.on('connect', () => {
+            console.log('Connected to WebSocket server');
+        });
+
+        echo.connector.socket.on('btcPrice', (data) => {
+            console.log('Received BTC price update:', data.price);
+            setBtcPrice(data.price);
+        });
+
+        return () => {
+            echo.disconnect();
+        };
     }, []);
 
     return (
-        <AuthenticatedLayout
-            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Positions</h2>}
-        >
-            <Head title="Positions" />
-
+        <AuthenticatedLayout>
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                        <div className="p-6 text-gray-900">
-                            <h3 className="text-lg font-medium">Current Positions</h3>
-
-                            {/* Refresh Button */}
-                            <button
-                                onClick={refreshPositions}
-                                className={`px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 my-4 ${
-                                    isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
-                                disabled={isRefreshing}
-                            >
-                                {isRefreshing ? 'Refreshing...' : 'Refresh Positions'}
-                            </button>
-
-                            {error && <p className="text-red-600">{error}</p>}
-
-                            {/* Positions Table */}
+                    <div className="bg-white overflow-hidden shadow-xl sm:rounded-lg">
+                        <div className="p-6 sm:px-20 bg-white border-b border-gray-200">
+                            <h1 className="text-2xl font-bold">Positions</h1>
+                            <p className="mt-4">Current BTC Price: {btcPrice}</p>
                             {positions.length > 0 ? (
                                 <table className="table-auto w-full mt-4">
                                     <thead>
                                         <tr>
-                                            <th className="border px-4 py-2">Symbol</th>
-                                            <th className="border px-4 py-2">Side</th>
-                                            <th className="border px-4 py-2">Leverage</th>
-                                            <th className="border px-4 py-2">Size</th>
-                                            <th className="border px-4 py-2">Position Margin</th>
+                                            <th className="px-4 py-2">Symbol</th>
+                                            <th className="px-4 py-2">Position Side</th>
+                                            <th className="px-4 py-2">Leverage</th>
+                                            <th className="px-4 py-2">Size</th>
+                                            <th className="px-4 py-2">Position Margin</th>
                                         </tr>
                                     </thead>
                                     <tbody>

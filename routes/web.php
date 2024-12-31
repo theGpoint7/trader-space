@@ -8,6 +8,16 @@ use App\Http\Controllers\TradeController;
 use App\Http\Controllers\SignalController;
 use App\Http\Controllers\ProfileController;
 
+// Test route for CORS
+Route::get('/test-cors', function () {
+    return response()->json(['message' => 'CORS is working!']);
+});
+Route::post('/test-preflight', function () {
+    return response()->json(['message' => 'Preflight request successful']);
+});
+
+
+// Welcome route
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
@@ -37,7 +47,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Add this new route for syncing trade history
     Route::get('/trades/sync-history', [TradeController::class, 'syncTradeHistory'])->name('trades.syncHistory');
 });
-
 
 // Profile routes
 Route::middleware('auth')->group(function () {

@@ -3,8 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Models\Trade;
-use App\Models\PositionLog;
 use Ratchet\Client\Connector;
 use React\EventLoop\Factory as LoopFactory;
 use Illuminate\Support\Facades\Config;
@@ -13,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 class PhemexWebSocketListener extends Command
 {
     protected $signature = 'phemex:listen-websocket';
-    protected $description = 'Listen to Phemex WebSocket for real-time trade and position updates';
+    protected $description = 'Listen to Phemex WebSocket for real-time BTC price updates';
 
     protected $apiKey;
     protected $apiSecret;
@@ -34,7 +32,7 @@ class PhemexWebSocketListener extends Command
             $this->info("WebSocket connected successfully!");
             Log::channel('websocket')->debug("WebSocket connected successfully");
 
-            // Step 1: Authenticate
+            // Authenticate with the Phemex WebSocket
             $expiry = now()->timestamp + 120;
             $stringToSign = $this->apiKey . $expiry;
             $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
@@ -102,92 +100,28 @@ class PhemexWebSocketListener extends Command
 
         // Successful authentication
         if (isset($data['id']) && $data['id'] == 1 && $data['result']['status'] === 'success') {
-            $this->info("Authentication successful. Subscribing to streams...");
+            $this->info("Authentication successful. Subscribing to BTC price updates...");
             Log::channel('websocket')->debug("Authentication successful");
 
-            // // Subscribe to trade updates
-            // $tradePayload = [
-            //     "method" => "trade.subscribe",
-            //     "params" => ["BTCUSD"], // Replace with your trading symbol
-            //     "id" => 4
-            // ];
-            // $conn->send(json_encode($tradePayload));
-            // $this->info("Sent: Trade Subscription");
-            // Log::channel('websocket')->debug("Sent trade subscription payload", $tradePayload);
-
-            // Subscribe to AOP (account/order/position) updates
-            $aopPayload = [
-                "method" => "aop.subscribe",
-                "params" => [],
-                "id" => 2
+            // Subscribe to BTC price updates
+            $btcPricePayload = [
+                "method" => "tick.subscribe",
+                "params" => [".BTC"],
+                "id" => 4
             ];
-            $conn->send(json_encode($aopPayload));
-            $this->info("Sent: AOP Subscription");
-            Log::channel('websocket')->debug("Sent AOP subscription payload", $aopPayload);
+            $conn->send(json_encode($btcPricePayload));
+            $this->info("Sent: BTC Price Subscription");
+            Log::channel('websocket')->debug("Sent BTC price subscription payload", $btcPricePayload);
         }
 
-        // Successful AOP subscription
-        if (isset($data['id']) && $data['id'] == 2 && $data['error'] === null) {
-            $this->info("AOP subscription successful.");
-            Log::channel('websocket')->debug("AOP subscription successful");
-        }
+        // Handle BTC price updates
+        if (isset($data['tick']) && isset($data['tick']['symbol']) && $data['tick']['symbol'] === ".BTC") {
+            $price = $data['tick']['last'] / (10 ** $data['tick']['scale']);
+            $this->info("BTC Price Update: $price");
+            Log::channel('websocket')->info("BTC Price Update", ['price' => $price]);
 
-        // Successful trade subscription
-        if (isset($data['id']) && $data['id'] == 4 && $data['error'] === null) {
-            $this->info("Trade subscription successful.");
-            Log::channel('websocket')->debug("Trade subscription successful");
-        }
-
-        // Handle incoming trade messages
-        if (isset($data['trades'])) {
-            foreach ($data['trades'] as $trade) {
-                $this->info("Trade Executed: " . json_encode($trade));
-                Log::channel('websocket')->debug("Trade executed", $trade);
-            }
-        }
-
-        // Handle AOP updates
-        if (isset($data['accounts']) || isset($data['orders']) || isset($data['positions'])) {
-            $this->info("AOP Update: " . json_encode($data));
-            Log::channel('websocket')->debug("AOP update received", $data);
-
-            if (isset($data['positions'])) {
-                foreach ($data['positions'] as $position) {
-                    $this->updatePosition($position);
-                }
-            }
-        }
-    }
-
-    private function updatePosition($position)
-    {
-        $symbol = $position['symbol'];
-        $size = $position['size'];
-        $price = $position['avgEntryPriceRp'] / 10000 ?? null;
-
-        $this->info("Processing Position: Symbol: $symbol, Size: $size, Price: $price");
-        Log::channel('websocket')->debug("Processing position", $position);
-
-        $existingTrade = Trade::where('symbol', $symbol)->where('status', 'open')->first();
-
-        if ($size > 0) {
-            if (!$existingTrade) {
-                $trade = Trade::create([
-                    'user_id' => Config::get('services.phemex.user_id'),
-                    'broker' => 'Phemex',
-                    'symbol' => $symbol,
-                    'side' => strtolower($position['side']),
-                    'quantity' => $size,
-                    'price' => $price,
-                    'status' => 'open',
-                    'trigger_source' => 'websocket',
-                ]);
-                $this->info("Stored New Position: " . json_encode($trade));
-                Log::channel('websocket')->debug("Stored new position", $trade->toArray());
-            } else {
-                $this->info("Existing position updated.");
-                Log::channel('websocket')->debug("Existing position updated", ['symbol' => $symbol]);
-            }
+            // Broadcast the price to connected clients or update as needed
+            broadcast(new \App\Events\BtcPriceUpdated($price));
         }
     }
 }

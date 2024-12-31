@@ -17,7 +17,7 @@ services:
             XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
             XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
             IGNITION_LOCAL_SITES_PATH: '${PWD}'
-            TZ: 'Europe/Amsterdam' # Add this line
+            # TZ: 'Europe/Amsterdam' # Add this line
         volumes:
             - '.:/var/www/html'
             - '/etc/timezone:/etc/timezone:ro' # Add this line
@@ -30,6 +30,10 @@ services:
             - meilisearch
             - mailpit
             - selenium
+            - socketio
+        # command: >
+        #     sh -c "php artisan serve --host=0.0.0.0 --port=80 &
+        #     php artisan phemex:listen-websocket"
     mysql:
         image: 'mysql/mysql-server:8.0'
         ports:
@@ -115,7 +119,14 @@ services:
             MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
         networks:
             - sail
-
+    socketio:
+        build:
+            context: ./socketio
+            dockerfile: Dockerfile
+        ports:
+            - '4000:4000'
+        networks:
+            - sail
 networks:
     sail:
         driver: bridge
