@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import Echo from 'laravel-echo';
 import io from 'socket.io-client';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import axios from 'axios'; // Add Axios for API requests
 
 window.io = io;
 
 export default function Positions({ positions }) {
     const [btcPrice, setBtcPrice] = useState('Loading...');
+    const [accountBalance, setAccountBalance] = useState('Loading...'); // State for account balance
 
     useEffect(() => {
         const echo = new Echo({
@@ -28,6 +30,19 @@ export default function Positions({ positions }) {
         };
     }, []);
 
+    // Fetch the account balance on component mount
+    useEffect(() => {
+        axios
+            .get('/api/account-balance')
+            .then((response) => {
+                setAccountBalance(response.data.balance);
+            })
+            .catch((error) => {
+                console.error('Error fetching account balance:', error);
+                setAccountBalance('Error fetching balance');
+            });
+    }, []);
+
     return (
         <AuthenticatedLayout>
             <div className="py-12">
@@ -36,6 +51,7 @@ export default function Positions({ positions }) {
                         <div className="p-6 sm:px-20 bg-white border-b border-gray-200">
                             <h1 className="text-2xl font-bold">Positions</h1>
                             <p className="mt-4">Current BTC Price: {btcPrice}</p>
+                            <p className="mt-4">Account Balance: {accountBalance} USDT</p> {/* Display balance */}
                             {positions.length > 0 ? (
                                 <table className="table-auto w-full mt-4">
                                     <thead>

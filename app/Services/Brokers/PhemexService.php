@@ -318,5 +318,42 @@ class PhemexService
             }
         }
         
-
+    public function getAccountBalance()
+        {
+            try {
+                $expiry = now()->timestamp + 60; // 1-minute expiry
+                $path = '/g-accounts/accountPositions'; // Endpoint used for positions (includes account info)
+                $queryString = 'currency=USDT'; // Adjust the query string as needed
+        
+                // Generate the signature
+                $stringToSign = $path . $queryString . $expiry;
+                $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
+        
+                // Make the request
+                $response = $this->http->get($path, [
+                    'query' => ['currency' => 'USDT'],
+                    'headers' => [
+                        'x-phemex-access-token' => $this->apiKey,
+                        'x-phemex-request-expiry' => $expiry,
+                        'x-phemex-request-signature' => $signature,
+                        'Content-Type' => 'application/json',
+                    ],
+                ]);
+        
+                $responseData = json_decode((string) $response->getBody(), true);
+        
+                if (isset($responseData['error'])) {
+                    \Log::error('Error fetching account balance: ' . $responseData['error']);
+                    return ['error' => $responseData['error']];
+                }
+        
+                // Extract the account balance
+                $account = $responseData['data']['account'] ?? null;
+                return $account ? $account['accountBalanceRv'] : '0.0';
+            } catch (\Exception $e) {
+                \Log::error('Exception fetching account balance: ' . $e->getMessage());
+                return ['error' => $e->getMessage()];
+            }
+        }
+        
     }

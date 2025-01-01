@@ -46,6 +46,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/trades/place-order', [TradeController::class, 'placeOrder'])->name('trades.placeOrder');
     // Add this new route for syncing trade history
     Route::get('/trades/sync-history', [TradeController::class, 'syncTradeHistory'])->name('trades.syncHistory');
+    Route::get('/api/account-balance', [TradeController::class, 'fetchAccountBalance'])->name('account.balance');
 });
 
 // Profile routes

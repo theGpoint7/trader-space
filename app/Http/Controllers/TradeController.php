@@ -203,7 +203,23 @@ class TradeController extends Controller
         }
     }
     
-
+        public function fetchAccountBalance()
+    {
+        try {
+                $phemexService = app('App\Services\Brokers\PhemexService');
+                $balance = $phemexService->getAccountBalance();
+        
+                if (isset($balance['error'])) {
+                    return response()->json(['error' => $balance['error']], 500);
+                }
+        
+                return response()->json(['balance' => $balance]);
+        } catch (\Exception $e) {
+                \Log::error('Exception fetching account balance: ' . $e->getMessage());
+                return response()->json(['error' => 'An unexpected error occurred.'], 500);
+        }
+    }
+    
         public function syncTradeHistory()
     {
         try {
