@@ -356,4 +356,61 @@ class PhemexService
             }
         }
         
+    public function changeLeverage(string $symbol, int $longLeverage, int $shortLeverage)
+        {
+            try {
+                $expiry = now()->timestamp + 60; // 1-minute expiry
+                $path = '/g-positions/leverage';
+                $queryString = "symbol={$symbol}&longLeverageRr={$longLeverage}&shortLeverageRr={$shortLeverage}";
+        
+                // Construct the string to sign
+                $stringToSign = $path . $queryString . $expiry;
+        
+                // Generate HMAC SHA256 signature
+                $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
+        
+                // Log details for debugging
+                \Log::info('Changing Leverage', [
+                    'endpoint' => $path,
+                    'query_string' => $queryString,
+                    'string_to_sign' => $stringToSign,
+                    'signature' => $signature,
+                    'expiry' => $expiry,
+                ]);
+        
+                // Make the PUT request with query parameters
+                $response = $this->http->put($path, [
+                    'query' => [
+                        'symbol' => $symbol,
+                        'longLeverageRr' => $longLeverage,
+                        'shortLeverageRr' => $shortLeverage,
+                    ],
+                    'headers' => [
+                        'x-phemex-access-token' => $this->apiKey,
+                        'x-phemex-request-expiry' => $expiry,
+                        'x-phemex-request-signature' => $signature,
+                        'Content-Type' => 'application/json',
+                    ],
+                ]);
+        
+                $responseBody = (string) $response->getBody();
+        
+                // Log the response
+                \Log::info('Leverage Change Response', [
+                    'status_code' => $response->getStatusCode(),
+                    'response_body' => $responseBody,
+                ]);
+        
+                return json_decode($responseBody, true);
+            } catch (\Exception $e) {
+                \Log::error('Leverage Change Failed', [
+                    'error_message' => $e->getMessage(),
+                ]);
+        
+                return ['error' => $e->getMessage()];
+            }
+        }
+        
+        
+
     }

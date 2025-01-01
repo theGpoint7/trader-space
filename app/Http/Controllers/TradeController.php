@@ -271,4 +271,62 @@ class TradeController extends Controller
         }
     }
     
+        public function changeLeverage(Request $request)
+    {
+        $validated = $request->validate([
+            'symbol' => 'required|string',
+            'longLeverage' => 'required|integer|min:1|max:200',
+            'shortLeverage' => 'required|integer|min:1|max:200',
+        ]);
+
+        try {
+            $phemexService = app('App\Services\Brokers\PhemexService');
+            $response = $phemexService->changeLeverage(
+                $validated['symbol'],
+                $validated['longLeverage'],
+                $validated['shortLeverage']
+            );
+
+            if (isset($response['error'])) {
+                return response()->json(['error' => $response['error']], 500);
+            }
+
+            return response()->json(['success' => true, 'response' => $response]);
+        } catch (\Exception $e) {
+            \Log::error('Change Leverage Failed:', ['exception' => $e->getMessage()]);
+            return response()->json(['error' => 'An unexpected error occurred.'], 500);
+        }
+    }
+    
+        public function showCurrentLeverage(Request $request)
+    {
+        $validated = $request->validate([
+            'symbol' => 'required|string',
+        ]);
+    
+        try {
+            $phemexService = app('App\Services\Brokers\PhemexService');
+            $positions = $phemexService->getPositions();
+    
+            $currentPosition = collect($positions['data']['positions'] ?? [])
+                ->firstWhere('symbol', $validated['symbol']);
+    
+            if (!$currentPosition) {
+                return response()->json(['error' => 'No position found for the symbol.'], 404);
+            }
+    
+            return response()->json([
+                'symbol' => $currentPosition['symbol'],
+                'leverage' => $currentPosition['leverageRr'],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Show Current Leverage Failed:', ['exception' => $e->getMessage()]);
+            return response()->json(['error' => 'An unexpected error occurred.'], 500);
+        }
+    }
+    
+
+
+
+
 }

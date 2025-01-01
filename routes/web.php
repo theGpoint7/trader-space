@@ -47,6 +47,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Add this new route for syncing trade history
     Route::get('/trades/sync-history', [TradeController::class, 'syncTradeHistory'])->name('trades.syncHistory');
     Route::get('/api/account-balance', [TradeController::class, 'fetchAccountBalance'])->name('account.balance');
+    Route::put('/api/change-leverage', [TradeController::class, 'changeLeverage'])->name('change.leverage');
+    Route::get('/api/show-current-leverage', [TradeController::class, 'showCurrentLeverage'])->name('show.current.leverage');
 });
 
 // Profile routes
