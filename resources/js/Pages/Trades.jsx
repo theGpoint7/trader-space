@@ -1,30 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { Inertia } from '@inertiajs/inertia';
 
 export default function Trades({ phemexTrades }) {
-    const generateRandomOrderID = () => `order-${Math.random().toString(36).substr(2, 9)}`;
-
-    const { data, setData, put, processing } = useForm({
-        clOrdID: generateRandomOrderID(),
-        symbol: 'BTCUSDT',
-        side: '',
-        orderQtyRq: 0.001,
-        trigger_source: 'website_button',
-    });
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-
-        put('/trades/place-order', {
-            onSuccess: () => alert('Order placed successfully!'),
-            onError: (errors) => {
-                console.error(errors);
-                alert(`Error: ${JSON.stringify(errors)}`);
-            },
-        });
-    };
-
     const handleSyncHistory = () => {
         if (confirm('Are you sure you want to sync trade history?')) {
             Inertia.get('/trades/sync-history', {
@@ -62,97 +40,6 @@ export default function Trades({ phemexTrades }) {
                                     Sync Trade History
                                 </button>
                             </div>
-
-                            <form onSubmit={handleSubmit}>
-                                {/* Order ID Input */}
-                                <div className="mb-4">
-                                    <label htmlFor="clOrdID" className="block text-sm font-medium text-gray-700">
-                                        Order ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="clOrdID"
-                                        value={data.clOrdID}
-                                        onChange={(e) => setData('clOrdID', e.target.value)}
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    />
-                                </div>
-
-                                {/* Symbol Input */}
-                                <div className="mb-4">
-                                    <label htmlFor="symbol" className="block text-sm font-medium text-gray-700">
-                                        Symbol
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="symbol"
-                                        value={data.symbol}
-                                        onChange={(e) => setData('symbol', e.target.value)}
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    />
-                                </div>
-
-                                {/* Side Input */}
-                                <div className="mb-4">
-                                    <label htmlFor="side" className="block text-sm font-medium text-gray-700">
-                                        Side
-                                    </label>
-                                    <select
-                                        id="side"
-                                        value={data.side}
-                                        onChange={(e) => setData('side', e.target.value)}
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    >
-                                        <option value="" disabled>Select Side</option>
-                                        <option value="buy">Buy</option>
-                                        <option value="sell">Sell</option>
-                                    </select>
-                                </div>
-
-                                {/* Order Quantity Input */}
-                                <div className="mb-4">
-                                    <label htmlFor="orderQtyRq" className="block text-sm font-medium text-gray-700">
-                                        Order Quantity
-                                    </label>
-                                    <input
-                                        type="number"
-                                        id="orderQtyRq"
-                                        value={data.orderQtyRq}
-                                        onChange={(e) => setData('orderQtyRq', parseFloat(e.target.value))}
-                                        step="0.001"
-                                        min="0.001"
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    />
-                                </div>
-
-                                {/* Trigger Source Input */}
-                                <div className="mb-4">
-                                    <label htmlFor="trigger_source" className="block text-sm font-medium text-gray-700">
-                                        Trigger Source
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="trigger_source"
-                                        value={data.trigger_source}
-                                        onChange={(e) => setData('trigger_source', e.target.value)}
-                                        required
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    />
-                                </div>
-
-                                {/* Submit Button */}
-                                <button
-                                    type="submit"
-                                    disabled={processing}
-                                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                >
-                                    Place Order
-                                </button>
-                            </form>
 
                             {/* Phemex Trades Table */}
                             <div className="mt-8">

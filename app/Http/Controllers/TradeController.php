@@ -34,11 +34,12 @@ class TradeController extends Controller
             'clOrdID' => 'required|string',
             'symbol' => 'required|string',
             'side' => 'required|in:buy,sell',
+            'posSide' => 'required|in:Long,Short', // Validate posSide
             'orderQtyRq' => 'required|numeric|min:0.001',
             'trigger_source' => 'nullable|string',
             'signal_id' => 'nullable|exists:signals,id',
         ]);
-
+    
         try {
             $phemexService = app('App\Services\Brokers\PhemexService');
             $orderDetails = [
@@ -47,17 +48,17 @@ class TradeController extends Controller
                 'side' => ucfirst($validated['side']),
                 'ordType' => 'Market',
                 'timeInForce' => 'ImmediateOrCancel',
-                'posSide' => 'Long',
+                'posSide' => $validated['posSide'], // Pass posSide
                 'orderQtyRq' => $validated['orderQtyRq'],
             ];
-
+    
             $response = $phemexService->placeOrder($orderDetails);
-
+    
             if (isset($response['error'])) {
                 \Log::error('Trade Placement Error:', ['error' => $response['error']]);
                 return response()->json(['error' => $response['error']], 500);
             }
-
+    
             if ($response['code'] === 0 && $response['data']['ordStatus'] === 'Created') {
                 // Create the trade
                 $trade = Trade::create([
@@ -72,36 +73,17 @@ class TradeController extends Controller
                     'trigger_source' => $validated['trigger_source'] ?? 'website_button',
                     'signal_id' => $validated['signal_id'] ?? null,
                 ]);
-
-                // Fetch positions to retrieve leverage
-                $positions = $phemexService->getPositions();
-                $brokerPosition = collect($positions['data']['positions'] ?? [])
-                    ->firstWhere('symbol', $validated['symbol']);
-
-                if ($brokerPosition) {
-                    $trade->update([
-                        'leverage' => $brokerPosition['leverageRr'],
-                    ]);
-                }
-
-                // Log the position creation
-                PositionLog::create([
-                    'trade_id' => $trade->id,
-                    'symbol' => $trade->symbol,
-                    'action' => 'create',
-                    'details' => json_encode($response['data']),
-                    'executed_at' => now(),
-                ]);
-
+    
                 return response()->json(['success' => true, 'response' => $response]);
             }
-
+    
             return response()->json(['error' => 'Trade could not be placed.'], 500);
         } catch (\Exception $e) {
             \Log::error('Trade Placement Failed:', ['exception' => $e->getMessage()]);
             return response()->json(['error' => 'An unexpected error occurred.'], 500);
         }
     }
+    
     /**
      * Fetch positions and update trade status, including logging updates and closures.
      */

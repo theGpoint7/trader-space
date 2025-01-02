@@ -42,7 +42,7 @@ class PhemexService
                     '&ordType=' . $orderDetails['ordType'] .
                     '&timeInForce=' . $orderDetails['timeInForce'] .
                     '&symbol=' . $orderDetails['symbol'] .
-                    '&posSide=' . $orderDetails['posSide'] .
+                    '&posSide=' . $orderDetails['posSide'] . // Include posSide here
                     '&orderQtyRq=' . $orderDetails['orderQtyRq'];
         
                 // Construct the string to sign (remove '?' between path and query string)
@@ -68,7 +68,7 @@ class PhemexService
                         'ordType' => $orderDetails['ordType'],
                         'timeInForce' => $orderDetails['timeInForce'],
                         'symbol' => $orderDetails['symbol'],
-                        'posSide' => $orderDetails['posSide'],
+                        'posSide' => $orderDetails['posSide'], // Include posSide in the request
                         'orderQtyRq' => $orderDetails['orderQtyRq'],
                     ],
                     'headers' => [
@@ -97,6 +97,7 @@ class PhemexService
                 return ['error' => $e->getMessage()];
             }
         }
+        
         
     public function getPositions()
         {
