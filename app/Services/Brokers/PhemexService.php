@@ -3,8 +3,9 @@
 namespace App\Services\Brokers;
 
 use GuzzleHttp\Client;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Models\BrokerApiKey;
 
 class PhemexService
 {
@@ -15,134 +16,127 @@ class PhemexService
     const PLACE_ORDER_PATH = '/g-orders/create';
 
     public function __construct()
-        {
-            // Fetch keys from configuration (env variables)
-            $this->apiKey = Config::get('services.phemex.api_key');
-            $this->apiSecret = Config::get('services.phemex.api_secret');
+    {
+        // Initialize HTTP client with base URI
+        $this->http = new Client(['base_uri' => 'https://api.phemex.com']);
 
-            // Initialize HTTP client with base URI
-            $this->http = new Client(['base_uri' => 'https://api.phemex.com']);
+        // Fetch user-specific keys
+        $user = Auth::user();
+        if ($user) {
+            $brokerKey = BrokerApiKey::where('user_id', $user->id)
+                ->where('broker_name', 'Phemex')
+                ->first();
 
-            // Log initialization
-            Log::info('PhemexService initialized.', [
-                'api_key' => $this->apiKey ? 'SET' : 'NOT SET',
-                'api_secret' => $this->apiSecret ? 'SET' : 'NOT SET',
-            ]);
+            if ($brokerKey) {
+                $this->apiKey = decrypt($brokerKey->api_key);
+                $this->apiSecret = decrypt($brokerKey->api_secret);
+            } else {
+                Log::warning('No API keys found for the user.', ['user_id' => $user->id]);
+            }
+        } else {
+            Log::warning('No authenticated user found. Falling back to default API keys.');
+            $this->apiKey = config('services.phemex.api_key');
+            $this->apiSecret = config('services.phemex.api_secret');
         }
+
+        // Log initialization
+        Log::info('PhemexService initialized.', [
+            'api_key' => $this->apiKey ? 'SET' : 'NOT SET',
+            'api_secret' => $this->apiSecret ? 'SET' : 'NOT SET',
+        ]);
+    }
 
     public function placeOrder(array $orderDetails)
-        {
-            try {
-                // Calculate expiry (1 minute from now)
-                $expiry = now()->timestamp + 60;
-        
-                // Manually construct the query string to ensure parameter order matches Postman
-                $queryString = 'clOrdID=' . $orderDetails['clOrdID'] .
-                    '&side=' . $orderDetails['side'] .
-                    '&ordType=' . $orderDetails['ordType'] .
-                    '&timeInForce=' . $orderDetails['timeInForce'] .
-                    '&symbol=' . $orderDetails['symbol'] .
-                    '&posSide=' . $orderDetails['posSide'] . // Include posSide here
-                    '&orderQtyRq=' . $orderDetails['orderQtyRq'];
-        
-                // Construct the string to sign (remove '?' between path and query string)
-                $stringToSign = self::PLACE_ORDER_PATH . $queryString . $expiry;
-        
-                // Generate the signature
-                $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
-        
-                // Log details for debugging
-                \Log::info('Placing Order', [
-                    'endpoint' => self::PLACE_ORDER_PATH,
-                    'query_string' => $queryString,
-                    'string_to_sign' => $stringToSign,
-                    'signature' => $signature,
-                    'expiry' => $expiry,
-                ]);
-        
-                // Make the PUT request
-                $response = $this->http->put(self::PLACE_ORDER_PATH, [
-                    'query' => [
-                        'clOrdID' => $orderDetails['clOrdID'],
-                        'side' => $orderDetails['side'],
-                        'ordType' => $orderDetails['ordType'],
-                        'timeInForce' => $orderDetails['timeInForce'],
-                        'symbol' => $orderDetails['symbol'],
-                        'posSide' => $orderDetails['posSide'], // Include posSide in the request
-                        'orderQtyRq' => $orderDetails['orderQtyRq'],
-                    ],
-                    'headers' => [
-                        'x-phemex-access-token' => $this->apiKey,
-                        'x-phemex-request-expiry' => $expiry,
-                        'x-phemex-request-signature' => $signature,
-                        'Content-Type' => 'application/json',
-                    ],
-                ]);
-        
-                $responseBody = (string) $response->getBody();
-        
-                // Log the response
-                \Log::info('Order Response', [
-                    'status_code' => $response->getStatusCode(),
-                    'response_body' => $responseBody,
-                ]);
-        
-                return json_decode($responseBody, true);
-            } catch (\Exception $e) {
-                // Log exception
-                \Log::error('Order Placement Failed', [
-                    'error_message' => $e->getMessage(),
-                ]);
-        
-                return ['error' => $e->getMessage()];
-            }
+    {
+        try {
+            $expiry = now()->timestamp + 60;
+            $queryString = 'clOrdID=' . $orderDetails['clOrdID'] .
+                '&side=' . $orderDetails['side'] .
+                '&ordType=' . $orderDetails['ordType'] .
+                '&timeInForce=' . $orderDetails['timeInForce'] .
+                '&symbol=' . $orderDetails['symbol'] .
+                '&posSide=' . $orderDetails['posSide'] .
+                '&orderQtyRq=' . $orderDetails['orderQtyRq'];
+
+            $stringToSign = self::PLACE_ORDER_PATH . $queryString . $expiry;
+            $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
+
+            Log::info('Placing Order', [
+                'endpoint' => self::PLACE_ORDER_PATH,
+                'query_string' => $queryString,
+                'string_to_sign' => $stringToSign,
+                'signature' => $signature,
+                'expiry' => $expiry,
+            ]);
+
+            $response = $this->http->put(self::PLACE_ORDER_PATH, [
+                'query' => [
+                    'clOrdID' => $orderDetails['clOrdID'],
+                    'side' => $orderDetails['side'],
+                    'ordType' => $orderDetails['ordType'],
+                    'timeInForce' => $orderDetails['timeInForce'],
+                    'symbol' => $orderDetails['symbol'],
+                    'posSide' => $orderDetails['posSide'],
+                    'orderQtyRq' => $orderDetails['orderQtyRq'],
+                ],
+                'headers' => [
+                    'x-phemex-access-token' => $this->apiKey,
+                    'x-phemex-request-expiry' => $expiry,
+                    'x-phemex-request-signature' => $signature,
+                    'Content-Type' => 'application/json',
+                ],
+            ]);
+
+            $responseBody = (string) $response->getBody();
+            Log::info('Order Response', [
+                'status_code' => $response->getStatusCode(),
+                'response_body' => $responseBody,
+            ]);
+
+            return json_decode($responseBody, true);
+        } catch (\Exception $e) {
+            Log::error('Order Placement Failed', [
+                'error_message' => $e->getMessage(),
+            ]);
+            return ['error' => $e->getMessage()];
         }
-        
-        
+    }
+
     public function getPositions()
-        {
-            try {
-                $expiry = now()->timestamp + 60; // 1-minute expiry
-                $path = '/g-accounts/accountPositions';
-                $queryString = 'currency=USDT';
+    {
+        try {
+            $expiry = now()->timestamp + 60;
+            $path = '/g-accounts/accountPositions';
+            $queryString = 'currency=USDT';
+            $stringToSign = $path . $queryString . $expiry;
+            $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
 
-                // Construct the string to sign (no '?' after the path)
-                $stringToSign = $path . $queryString . $expiry;
+            Log::info('Fetching Positions', [
+                'endpoint' => $path,
+                'string_to_sign' => $stringToSign,
+                'signature' => $signature,
+                'expiry' => $expiry,
+            ]);
 
-                // Generate HMAC SHA256 signature
-                $signature = hash_hmac('sha256', $stringToSign, $this->apiSecret);
+            $response = $this->http->get($path, [
+                'query' => ['currency' => 'USDT'],
+                'headers' => [
+                    'x-phemex-access-token' => $this->apiKey,
+                    'x-phemex-request-expiry' => $expiry,
+                    'x-phemex-request-signature' => $signature,
+                    'Content-Type' => 'application/json',
+                ],
+            ]);
 
-                // Log details for debugging
-                \Log::info('Fetching Positions', [
-                    'endpoint' => $path,
-                    'string_to_sign' => $stringToSign,
-                    'signature' => $signature,
-                    'expiry' => $expiry,
-                ]);
+            $responseData = json_decode((string) $response->getBody(), true);
+            Log::info('Phemex API Response:', $responseData);
 
-                // Make the GET request
-                $response = $this->http->get($path, [
-                    'query' => ['currency' => 'USDT'], // Pass the query parameter
-                    'headers' => [
-                        'x-phemex-access-token' => $this->apiKey,
-                        'x-phemex-request-expiry' => $expiry,
-                        'x-phemex-request-signature' => $signature,
-                        'Content-Type' => 'application/json',
-                    ],
-                ]);
-
-                $responseData = json_decode((string) $response->getBody(), true);
-
-                // Log the raw response for debugging
-                \Log::info('Phemex API Response:', $responseData);
-
-                return $responseData;
-            } catch (\Exception $e) {
-                // Log the error message
-                \Log::error('Phemex API Error: ' . $e->getMessage());
-                return ['error' => $e->getMessage()];
-            }
+            return $responseData;
+        } catch (\Exception $e) {
+            Log::error('Phemex API Error: ' . $e->getMessage());
+            return ['error' => $e->getMessage()];
         }
+    }
     
     public function syncTradeHistory()
         {

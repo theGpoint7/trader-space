@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Ratchet\Client\Connector;
 use React\EventLoop\Factory as LoopFactory;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 
 class PhemexWebSocketListener extends Command
@@ -13,18 +13,20 @@ class PhemexWebSocketListener extends Command
     protected $signature = 'phemex:listen-websocket';
     protected $description = 'Listen to Phemex WebSocket for real-time BTC price updates';
 
-    protected $apiKey;
-    protected $apiSecret;
-
-    public function __construct()
-    {
-        parent::__construct();
-        $this->apiKey = Config::get('services.phemex.api_key');
-        $this->apiSecret = Config::get('services.phemex.api_secret');
-    }
+    private $apiKey;
+    private $apiSecret;
 
     public function handle()
     {
+        // Fetch the API key and secret from the .env file
+        $this->apiKey = env('PHEMEX_API_KEY');
+        $this->apiSecret = env('PHEMEX_API_SECRET');
+
+        if (!$this->apiKey || !$this->apiSecret) {
+            $this->error('API key or secret not found in the environment variables.');
+            return;
+        }
+
         $loop = LoopFactory::create();
         $connector = new Connector($loop);
 

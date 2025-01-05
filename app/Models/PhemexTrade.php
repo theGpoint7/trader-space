@@ -12,6 +12,7 @@ class PhemexTrade extends Model
     protected $table = 'phemex_trades';
 
     protected $fillable = [
+        'user_id',
         'transact_time_ns',
         'exec_id',
         'pos_side',
@@ -27,4 +28,5 @@ class PhemexTrade extends Model
         'side',
         'price',
     ];
+    
 }

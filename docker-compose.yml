@@ -31,7 +31,7 @@ services:
             - mailpit
             - selenium
             - socketio
-        command: >
+        command: 
             sh -c "php artisan serve --host=0.0.0.0 --port=80 &
             php artisan phemex:listen-websocket"
     mysql:

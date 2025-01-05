@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Trade;
+use App\Models\PhemexTrade;
 use App\Models\PositionLog;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -85,7 +86,7 @@ class TradeController extends Controller
     }
     
     /**
-     * Fetch positions and update trade status, including logging updates and closures.
+     * Fetch positions and don't store them in the database.
      */
         public function getPositions()
     {
@@ -100,82 +101,7 @@ class TradeController extends Controller
     
             $positions = $response['data']['positions'] ?? [];
     
-            // Fetch all existing open trades for the user
-            $openTrades = Trade::where('user_id', auth()->id())
-                ->where('status', 'open')
-                ->get();
-    
-            foreach ($positions as $position) {
-                if ($position['size'] > 0) {
-                    // Look for an existing trade with the same symbol
-                    $existingTrade = Trade::where('user_id', auth()->id())
-                        ->where('symbol', $position['symbol'])
-                        ->where('status', 'open')
-                        ->first();
-    
-                    if ($existingTrade) {
-                        // Update the existing trade's details
-                        $existingTrade->update([
-                            'quantity' => $position['size'],
-                            'leverage' => $position['leverageRr'],
-                        ]);
-    
-                        // Log the update
-                        PositionLog::create([
-                            'trade_id' => $existingTrade->id,
-                            'symbol' => $position['symbol'],
-                            'action' => 'update',
-                            'details' => json_encode($position),
-                            'executed_at' => now(),
-                        ]);
-                    } else {
-                        // No existing trade, create a new one
-                        $trade = Trade::create([
-                            'user_id' => auth()->id(),
-                            'broker' => 'Phemex',
-                            'symbol' => $position['symbol'],
-                            'side' => $position['posSide'] === 'Buy' ? 'buy' : 'sell',
-                            'quantity' => $position['size'],
-                            'price' => $position['avgEntryPriceRp'],
-                            'leverage' => $position['leverageRr'],
-                            'status' => 'open',
-                            'trigger_source' => 'broker',
-                        ]);
-    
-                        // Log the creation
-                        PositionLog::create([
-                            'trade_id' => $trade->id,
-                            'symbol' => $position['symbol'],
-                            'action' => 'create',
-                            'details' => json_encode($position),
-                            'executed_at' => now(),
-                        ]);
-                    }
-                } else {
-                    // If position size is 0, mark the trade as closed
-                    $closedTrade = Trade::where('user_id', auth()->id())
-                        ->where('symbol', $position['symbol'])
-                        ->where('status', 'open')
-                        ->first();
-    
-                    if ($closedTrade) {
-                        $closedTrade->update([
-                            'status' => 'closed',
-                            'updated_at' => now(),
-                        ]);
-    
-                        // Log the closure
-                        PositionLog::create([
-                            'trade_id' => $closedTrade->id,
-                            'symbol' => $position['symbol'],
-                            'action' => 'close',
-                            'details' => json_encode($position),
-                            'executed_at' => now(),
-                        ]);
-                    }
-                }
-            }
-    
+            // Return positions directly without updating trades
             return inertia('Positions', [
                 'positions' => $positions,
             ]);
@@ -184,6 +110,7 @@ class TradeController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
+    
     
         public function fetchAccountBalance()
     {
@@ -205,27 +132,30 @@ class TradeController extends Controller
         public function syncTradeHistory()
     {
         try {
-            // Fetch trade history using the service
             $phemexService = app('App\Services\Brokers\PhemexService');
             $response = $phemexService->getTradeHistory();
     
-            // Log API response for debugging
+            // Log the response details
             \Log::info('Sync Trade History Response: ', $response);
     
-            // Handle API errors
             if (isset($response['error'])) {
                 \Log::error('Error fetching trade history: ' . $response['error']);
-                return response()->json(['error' => $response['error']], 409); // Return conflict error
+                return response()->json(['error' => $response['error']], 409);
             }
     
-            // Process trade data
             $trades = $response['data']['rows'] ?? [];
+    
+            if (empty($trades)) {
+                \Log::warning('No trade history data returned from Phemex API.');
+                return response()->json(['message' => 'No trades found in trade history.'], 200);
+            }
     
             foreach ($trades as $trade) {
                 try {
-                    \App\Models\PhemexTrade::firstOrCreate(
-                        ['transact_time_ns' => $trade['transactTimeNs'] ?? null], // Unique identifier
+                    PhemexTrade::firstOrCreate(
+                        ['transact_time_ns' => $trade['transactTimeNs'] ?? null],
                         [
+                            'user_id' => auth()->id(),
                             'exec_id' => $trade['execID'] ?? null,
                             'pos_side' => $trade['posSide'] ?? null,
                             'ord_type' => $trade['ordType'] ?? null,
@@ -253,6 +183,7 @@ class TradeController extends Controller
         }
     }
     
+
         public function changeLeverage(Request $request)
     {
         $validated = $request->validate([
