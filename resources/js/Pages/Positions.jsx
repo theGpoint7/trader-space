@@ -29,25 +29,28 @@ export default function Positions({ positions }) {
 
     // WebSocket listener for BTC price
     useEffect(() => {
-        const socket = io('http://localhost:4000'); // Connect to the WebSocket server
-
+        const socket = io(process.env.NODE_ENV === 'production' 
+            ? 'https://smart-turkey-crisp.ngrok-free.app' // Ngrok domain for production
+            : 'https://localhost:4000'); // Localhost for development
+    
         socket.on('connect', () => {
             console.log('Connected to WebSocket server');
         });
-
+    
         socket.on('btcPrice', (data) => {
             console.log('Received BTC price update:', data);
             setBtcPrice(data.price || 'Error: Invalid data'); // Update state with the price
         });
-
+    
         socket.on('connect_error', (err) => {
             console.error('WebSocket connection error:', err);
         });
-
+    
         return () => {
             socket.disconnect(); // Cleanup the WebSocket connection on component unmount
         };
     }, []);
+    
 
     // Fetch account balance and update loading state
     useEffect(() => {

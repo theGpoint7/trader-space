@@ -50,11 +50,32 @@ class PhemexWebSocketListener extends Command
             ];
 
             $this->info("Auth Payload: " . json_encode($authPayload));
+            Log::channel('websocket')->debug("Sending authentication payload", $authPayload);
             $conn->send(json_encode($authPayload));
 
             // Handle incoming messages
             $conn->on('message', function ($msg) use ($conn) {
-                $this->processMessage($msg, $conn);
+                $data = json_decode($msg, true);
+                if (isset($data['tick']['last'])) {
+                    $btcPrice = $data['tick']['last'] / pow(10, $data['tick']['scale']);
+                    Log::channel('websocket')->info("BTC Price Update: $btcPrice");
+
+                    // Send the BTC price to the Socket.io server
+                    $response = Http::post('http://localhost:4000/update-btc-price', [
+                        'price' => $btcPrice
+                    ]);
+
+                    if ($response->successful()) {
+                        Log::channel('websocket')->info("BTC Price sent to Socket.IO server successfully", [
+                            'price' => $btcPrice
+                        ]);
+                    } else {
+                        Log::channel('websocket')->error("Failed to send BTC price to Socket.IO server", [
+                            'price' => $btcPrice,
+                            'response' => $response->body()
+                        ]);
+                    }
+                }
             });
 
             // Add heartbeat pings
@@ -112,9 +133,11 @@ class PhemexWebSocketListener extends Command
             $this->info("BTC Price Update: $price");
 
             // Send the BTC price to the Socket.io server
-            $response = Http::post('http://socketio:4000/update-btc-price', [
-                'price' => $price
+            $response = Http::post(env('SOCKETIO_HOST') . '/update-btc-price', [
+                'price' => $price,
             ]);
+            
+            
 
             if ($response->successful()) {
                 $this->info("BTC Price sent to Socket.IO server successfully");

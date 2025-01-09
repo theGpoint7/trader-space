@@ -3,34 +3,47 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Services\SignalService;
+use App\Models\Signal;
 
 class SignalController extends Controller
 {
     public function processSignal(Request $request)
-    {
-        // Validate the incoming request
-        $validated = $request->validate([
-            'order.strategy' => 'required|string',
-            'order.action' => 'required|string',
-            'order.price' => 'required|numeric',
-            'order.ticker' => 'required|string',
-            'order.type' => 'required|string',
-        ]);
+{
+    // Validate the incoming message
+    $validated = $request->validate([
+        'message' => 'required|string',
+    ]);
 
-        // Extract the data
-        $orderData = $validated['order'];
+    // Extract message
+    $message = $validated['message'];
 
-        
+    // Parse the message (basic example using regular expressions)
+    preg_match('/order (\w+) @ (\d+) filled on ([A-Za-z]+)\./', $message, $matches);
 
-        // Process the signal (example: log it or call a service)
-        // You can pass this data to a SignalService for further processing
-        SignalService::process($orderData);
-
-        // Log the signal for debugging purposes
-        \Log::info('Received Signal:', $orderData);
-
-        // Return a success response
-        return response()->json(['status' => 'success', 'message' => 'Signal processed successfully']);
+    if (!$matches) {
+        return response()->json(['status' => 'error', 'message' => 'Invalid message format'], 400);
     }
+
+    // Map the extracted data to fields
+    $data = [
+        'name' => 'Fair 2 Value Gap with Cooldown and Fast Downtrend Pause',
+        'settings' => [
+            'action' => $matches[1] ?? null, // buy/sell action
+            'contracts' => $matches[2] ?? null, // number of contracts
+            'ticker' => $matches[3] ?? null, // ticker (e.g., BTC)
+        ],
+        'status' => 'received',
+        'received_at' => now(),
+    ];
+
+    // Store the signal in the database
+    Signal::create($data);
+
+    // Log the result
+    \Log::info('Signal stored successfully:', $data);
+
+    // Return a success response
+    return response()->json(['status' => 'success', 'message' => 'Signal processed and stored successfully']);
+}
+
 }

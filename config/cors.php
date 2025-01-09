@@ -15,9 +15,9 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie', '*'], // Allow paths for APIs and more
+    'paths' => ['api/*', 'sanctum/csrf-cookie', '/socket.io/*', '*'], // Allow paths for APIs and more
     'allowed_methods' => ['*'], // Allow all HTTP methods
-    'allowed_origins' => ['http://localhost:2000'], // Add your frontend origin
+    'allowed_origins' => ['*'], // Add your frontend origin
     'allowed_origins_patterns' => [], // Regex patterns for origins, if needed
     'allowed_headers' => ['*'], // Allow all headers
     'exposed_headers' => [],

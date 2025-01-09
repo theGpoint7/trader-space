@@ -19,6 +19,9 @@ Route::post('/test-preflight', function () {
     return response()->json(['message' => 'Preflight request successful']);
 });
 
+// Public API Route for Signals
+Route::post('/api/signals', [SignalController::class, 'processSignal'])->name('signals.process');
+
 // Welcome route
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -102,7 +105,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/account-balance', [TradeController::class, 'fetchAccountBalance'])->name('account.balance');
     Route::put('/api/change-leverage', [TradeController::class, 'changeLeverage'])->name('change.leverage');
     Route::get('/api/show-current-leverage', [TradeController::class, 'showCurrentLeverage'])->name('show.current.leverage');
-    Route::post('/api/signals', [SignalController::class, 'processSignal'])->name('signals.process');
 });
 
 // Profile routes

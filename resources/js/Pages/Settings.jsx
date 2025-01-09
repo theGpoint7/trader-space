@@ -47,10 +47,10 @@ export default function Settings() {
                                                 <strong>Broker:</strong> {key.broker_name}
                                             </p>
                                             <p>
-                                                <strong>API Key:</strong> {key.api_key}
+                                                <strong>API Key:</strong> {/* {key.api_key} */}
                                             </p>
                                             <p>
-                                                <strong>API Secret:</strong> {key.api_secret}
+                                                <strong>API Secret:</strong> {/* {key.api_secret} */}
                                             </p>
                                         </li>
                                     ))}

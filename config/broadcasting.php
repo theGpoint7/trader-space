@@ -29,14 +29,14 @@ return [
     */
 
     // filepath: /home/wsl_user/trader-space/config/broadcasting.php
-'connections' => [
-    'socketio' => [
-        'driver' => 'custom',
-        'via' => App\Broadcasting\SocketIoBroadcaster::class,
-        'host' => env('SOCKETIO_HOST'),
-        'port' => env('SOCKETIO_PORT'),
-        'scheme' => 'http',
-    ],
+    'connections' => [
+        'socketio' => [
+            'driver' => 'custom',
+            'via' => App\Broadcasting\SocketIoBroadcaster::class,
+            'host' => env('SOCKETIO_HOST'),
+            'port' => env('SOCKETIO_PORT'),
+            'scheme' => 'https',
+        ],
 ],
 
 ];

@@ -5,6 +5,9 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Contracts\Broadcasting\Broadcaster;
+use Ratchet\Client\WebSocket;
+use Ratchet\Client\Connector;
+use React\EventLoop\Factory as LoopFactory;
 
 class SocketIoBroadcastServiceProvider extends ServiceProvider
 {
@@ -19,17 +22,26 @@ class SocketIoBroadcastServiceProvider extends ServiceProvider
             return new class implements Broadcaster {
                 public function broadcast(array $channels, $event, array $payload = [])
                 {
-                    $socket = new \Ratchet\Client\WebSocket('ws://localhost:4000', ['Origin' => 'http://localhost']);
-                    $socket->on('open', function ($conn) use ($channels, $event, $payload) {
-                        foreach ($channels as $channel) {
-                            $conn->send(json_encode([
-                                'channel' => $channel,
-                                'event' => $event,
-                                'data' => $payload,
-                            ]));
-                        }
-                        $conn->close();
-                    });
+                    $loop = LoopFactory::create();
+                    $connector = new Connector($loop);
+
+                    $connector('wss://smart-turkey-crisp.ngrok-free.app', ['Origin' => 'https://localhost'])
+                        ->then(function (WebSocket $conn) use ($channels, $event, $payload, $loop) {
+                            foreach ($channels as $channel) {
+                                $conn->send(json_encode([
+                                    'channel' => $channel,
+                                    'event' => $event,
+                                    'data' => $payload,
+                                ]));
+                            }
+                            $conn->close();
+                            $loop->stop();
+                        }, function ($e) use ($loop) {
+                            echo "Could not connect: {$e->getMessage()}\n";
+                            $loop->stop();
+                        });
+
+                    $loop->run();
                 }
             };
         });
