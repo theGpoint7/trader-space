@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom styles for the TradingView widget container */
+.tradingview-widget-container {
+    height: 800px; /* Set this explicitly */
+    width: 100%;
+    position: relative; /* Ensure positioning doesn't conflict */
+}
+
+.tradingview-widget-container__widget {
+    height: 100%;
+    width: 100%;
+}
+
+.chart-container {
+    height: 500px; /* Adjust this value to increase the height */
+}
+
+/* Custom styles for the TradingView heatmap container */
+.tradingview-heatmap-container {
+    height: 800px; /* Set this explicitly */
+    width: 100%;
+    position: relative; /* Ensure positioning doesn't conflict */
+}
+
+.tradingview-heatmap-container__widget {
+    height: 100%;
+    width: 100%;
+}

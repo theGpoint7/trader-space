@@ -5,12 +5,17 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/js/app.jsx'],
+            input: ['resources/css/app.css', 'resources/js/app.jsx'],
             refresh: true,
         }),
         react(),
     ],
     server: {
-        https: true,
+        host: '0.0.0.0', // Ensure the server is accessible from outside the container
+        port: 5173, // Ensure this matches the exposed port
+        hmr: {
+            host: 'localhost',
+        },
+        https: true, // If you need HTTPS, otherwise you can set it to false
     },
 });

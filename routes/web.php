@@ -91,6 +91,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('trades');
 
+    // Chart route
+    Route::get('/chart', function () {
+        return Inertia::render('Chart');
+    })->name('chart');
+
     Route::put('/trades/place-order', [TradeController::class, 'placeOrder'])->name('trades.placeOrder');
 
     // API Routes for syncing and fetching trades

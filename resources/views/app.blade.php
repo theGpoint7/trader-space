@@ -17,7 +17,7 @@
             <script src="{{ mix('js/app.js') }}" defer></script>
         @else
             @viteReactRefresh
-            @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])
+            @vite(['resources/css/app.css', 'resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])
         @endif
         @inertiaHead
     </head>

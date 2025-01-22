@@ -43,6 +43,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                     Trades
                                 </NavLink>
                                 <NavLink
+                                    href={route('chart')}
+                                        active={route().current('chart')}
+                                >
+                                    Chart
+                                </NavLink>
+                                <NavLink
                                     href={route('settings')}
                                     active={route().current('settings')}
                                 >
